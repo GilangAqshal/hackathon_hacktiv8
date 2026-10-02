@@ -110,17 +110,17 @@ DermAgent dapat memahami konteks tersebut tanpa pengguna harus memasukkan ulang 
 
 ### Peran Teknologi
 
-| Komponen | Fungsi |
-|---|---|
-| HTML5 | Struktur halaman website |
-| CSS3 | Styling, responsive UI, animasi |
-| JavaScript | Interaksi website dan integrasi API |
-| YOLOv11 Nano | Model Computer Vision |
-| Roboflow | Deployment/inference model |
-| IBM Langflow | Workflow AI DermAgent |
-| Knowledge Base | Sumber informasi DermAgent |
-| Language Model | Menghasilkan respons percakapan |
-| IBM Bob | Development tool untuk membangun prototype website |
+| Komponen       | Fungsi                                             |
+| -------------- | -------------------------------------------------- |
+| HTML5          | Struktur halaman website                           |
+| CSS3           | Styling, responsive UI, animasi                    |
+| JavaScript     | Interaksi website dan integrasi API                |
+| YOLOv11 Nano   | Model Computer Vision                              |
+| Roboflow       | Deployment/inference model                         |
+| IBM Langflow   | Workflow AI DermAgent                              |
+| Knowledge Base | Sumber informasi DermAgent                         |
+| Language Model | Menghasilkan respons percakapan                    |
+| IBM Bob        | Development tool untuk membangun prototype website |
 
 ---
 
@@ -246,7 +246,7 @@ hackathon_hacktiv8/
 ### 1. Clone Repository
 
 ```bash
-git clone <URL-REPOSITORY-ANDA>
+git clone https://github.com/GilangAqshal/hackathon_hacktiv8
 cd hackathon_hacktiv8
 ```
 
@@ -361,12 +361,12 @@ Langflow kemudian menghasilkan jawaban yang ditampilkan kembali di floating chat
 
 Hasil evaluasi model yang digunakan dalam prototype:
 
-| Metrik | Hasil |
-|---|---:|
-| **mAP@50** | **88.7%** |
+| Metrik        |     Hasil |
+| ------------- | --------: |
+| **mAP@50**    | **88.7%** |
 | **Precision** | **83.3%** |
-| **Recall** | **89.9%** |
-| **F1 Score** | **86.5%** |
+| **Recall**    | **89.9%** |
+| **F1 Score**  | **86.5%** |
 
 > Metrik tersebut merupakan hasil evaluasi model pada eksperimen project dan bukan jaminan akurasi diagnosis medis pada kondisi dunia nyata.
 
