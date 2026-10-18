@@ -1,27 +1,16 @@
 /* ============================================================
-   DermAgent — Langflow chatbot
+   DermAgent — chatbot widget
+   Backend: /api/chat (Vercel serverless → Astra DB + Gemini)
    Requires: js/script.js loaded before this file.
    ============================================================ */
 
 const DERMAGENT_CONFIG = {
-  endpoint:
-    "http://localhost:7860/api/v1/run/c6bc8a3a-c217-49fa-9f45-da4acc78383f",
-  apiKey: "sk-II1TBNicIBhNZ7MI8YVnvXpti9fJ8-WCQTMy-7CYIM0",
-  outputType: "chat",
-  inputType: "chat",
+  endpoint: "/api/chat",
 };
 
 const DERMAGENT_STORAGE_KEY = "dermagent_detection_context";
-const DERMAGENT_SESSION_KEY = "dermagent_session_id";
-
-function getDermAgentSessionId() {
-  let id = sessionStorage.getItem(DERMAGENT_SESSION_KEY);
-  if (!id) {
-    id = crypto.randomUUID();
-    sessionStorage.setItem(DERMAGENT_SESSION_KEY, id);
-  }
-  return id;
-}
+const MAX_HISTORY = 6;
+let dermHistory = []; // riwayat percakapan singkat (reset saat pindah halaman)
 
 function saveDetectionContext(disease, confidence, source = "deteksi") {
   if (!disease) return;
@@ -78,56 +67,11 @@ function escapeHTML(value) {
   );
 }
 
-function extractLangflowText(data) {
-  const candidates = [
-    data?.outputs?.[0]?.outputs?.[0]?.results?.message?.text,
-    data?.outputs?.[0]?.outputs?.[0]?.results?.message?.message,
-    data?.outputs?.[0]?.outputs?.[0]?.results?.text,
-    data?.outputs?.[0]?.outputs?.[0]?.results?.message,
-    data?.outputs?.[0]?.outputs?.[0]?.outputs?.message?.message,
-    data?.outputs?.[0]?.outputs?.[0]?.outputs?.message?.text,
-    data?.outputs?.[0]?.outputs?.[0]?.text,
-    data?.message?.text,
-    data?.text,
-  ];
-  for (const value of candidates) {
-    if (typeof value === "string" && value.trim()) return value.trim();
-  }
-
-  // Last-resort recursive search for a likely text/message field.
-  const seen = new Set();
-  function walk(value) {
-    if (!value || typeof value !== "object" || seen.has(value)) return null;
-    seen.add(value);
-    for (const key of ["text", "message"]) {
-      if (typeof value[key] === "string" && value[key].trim())
-        return value[key].trim();
-    }
-    for (const child of Object.values(value)) {
-      const found = walk(child);
-      if (found) return found;
-    }
-    return null;
-  }
-  return walk(data);
-}
-
-function buildDermAgentInput(question) {
-  const ctx = getDetectionContext();
-  const detectionBlock = ctx
-    ? `Hasil Deteksi Website:
-- Penyakit/label model: ${ctx.disease}
-- Confidence: ${ctx.confidence}%
-- Sumber: ${ctx.source}
-
-`
-    : `Hasil Deteksi Website:
-- Belum ada hasil deteksi yang tersimpan.
-
-`;
-
-  return `${detectionBlock}Pertanyaan Pengguna:
-${question}`;
+// Teks bot → HTML aman (escape dulu, baru ubah **tebal** dan poin)
+function renderDermAgentText(text) {
+  return escapeHTML(text)
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/^[\*\-]\s+/gm, "• ");
 }
 
 function addDermAgentMessage(text, role = "bot") {
@@ -135,7 +79,8 @@ function addDermAgentMessage(text, role = "bot") {
   if (!box) return;
   const msg = document.createElement("div");
   msg.className = `da-msg ${role}`;
-  msg.textContent = text;
+  if (role === "bot") msg.innerHTML = renderDermAgentText(text);
+  else msg.textContent = text;
   box.appendChild(msg);
   box.scrollTop = box.scrollHeight;
   return msg;
@@ -149,17 +94,6 @@ async function sendDermAgentMessage() {
   const question = input.value.trim();
   if (!question || send.disabled) return;
 
-  if (
-    !DERMAGENT_CONFIG.apiKey ||
-    DERMAGENT_CONFIG.apiKey === "YOUR_LANGFLOW_API_KEY_HERE"
-  ) {
-    addDermAgentMessage(
-      "API key Langflow belum diisi. Buka js/chatbot.js lalu isi DERMAGENT_CONFIG.apiKey.",
-      "bot",
-    );
-    return;
-  }
-
   addDermAgentMessage(question, "user");
   input.value = "";
   send.disabled = true;
@@ -168,40 +102,36 @@ async function sendDermAgentMessage() {
   typing.classList.add("da-typing");
 
   try {
-    const payload = {
-      output_type: DERMAGENT_CONFIG.outputType,
-      input_type: DERMAGENT_CONFIG.inputType,
-      input_value: buildDermAgentInput(question),
-      session_id: getDermAgentSessionId(),
-    };
-
     const response = await fetch(DERMAGENT_CONFIG.endpoint, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": DERMAGENT_CONFIG.apiKey,
-      },
-      body: JSON.stringify(payload),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question,
+        detection: getDetectionContext(),
+        history: dermHistory,
+      }),
     });
 
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
-      throw new Error(
-        data?.message || data?.detail || `HTTP ${response.status}`,
-      );
+      throw new Error(data?.error || `HTTP ${response.status}`);
     }
 
-    const answer = extractLangflowText(data);
+    const answer = (data.answer || "").trim();
     typing.remove();
+    addDermAgentMessage(answer || "DermAgent tidak mengembalikan jawaban.");
 
-    addDermAgentMessage(
-      answer ||
-        "DermAgent menerima respons, tetapi format respons Langflow belum dapat dibaca oleh widget.",
-    );
+    if (answer) {
+      dermHistory.push(
+        { role: "user", text: question },
+        { role: "bot", text: answer },
+      );
+      dermHistory = dermHistory.slice(-MAX_HISTORY);
+    }
   } catch (error) {
     typing.remove();
     addDermAgentMessage(
-      `Gagal terhubung ke DermAgent.\n\n${error.message}\n\nPastikan Langflow berjalan di localhost:7860, flow aktif, API key benar, dan CORS mengizinkan website ini.`,
+      `Maaf, DermAgent sedang tidak dapat menjawab.\n\n${error.message}`,
     );
   } finally {
     send.disabled = false;
